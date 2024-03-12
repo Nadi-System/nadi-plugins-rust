@@ -1,0 +1,3 @@
+[workspace]
+members = ["print_node", "check-streamflow"]
+resolver = "2"
