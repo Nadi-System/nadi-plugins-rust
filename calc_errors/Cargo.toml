@@ -1,5 +1,5 @@
 [package]
-name = "check_streamflow"
+name = "calc_errors"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,5 +9,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-anyhow = "1.0.80"
+anyhow = "1.0.86"
 nadi_core = "0.2.1"
+nadi_plugin = "0.1.0"
+toml = "0.8.19"

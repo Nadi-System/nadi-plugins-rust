@@ -1,5 +1,5 @@
 [package]
-name = "check_streamflow"
+name = "dams"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,3 +11,5 @@ crate-type = ["cdylib"]
 [dependencies]
 anyhow = "1.0.80"
 nadi_core = "0.2.1"
+nadi_plugin = "0.1.0"
+toml = "0.8.12"
