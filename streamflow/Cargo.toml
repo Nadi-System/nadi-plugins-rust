@@ -1,5 +1,6 @@
+
 [package]
-name = "print_node2"
+name = "streamflow"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,6 +10,5 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-anyhow = "1.0.86"
-nadi_core = "0.2.1"
-nadi_plugin = "0.1.0"
+abi_stable = "0.11.3"
+nadi_core = {version="0.3.0", path="../../nadi_core"}

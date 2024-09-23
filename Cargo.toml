@@ -1,3 +1,3 @@
 [workspace]
-members = ["print_node", "print_node2", "check-streamflow", "dams", "calc_errors"]
+members = ["print_node", "print_node2", "streamflow", "dams", "calc_errors", "graphviz", "fancy-print"]
 resolver = "2"

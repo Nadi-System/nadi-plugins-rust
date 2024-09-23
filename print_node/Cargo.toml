@@ -9,4 +9,5 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-nadi_core = "0.2.1"
+abi_stable = "0.11.3"
+nadi_core = "0.3.0"

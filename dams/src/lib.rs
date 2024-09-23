@@ -1,21 +1,20 @@
-use nadi_plugin::nadi_plugin;
+use nadi_core::nadi_plugin::nadi_plugin;
 
 #[nadi_plugin]
 mod dams {
-    use anyhow::Result;
-    use nadi_core::attributes::AsValue;
+    use nadi_core::attrs::{Attribute, FromAttribute};
+    use nadi_core::nadi_plugin::node_func;
     use nadi_core::node::NodeInner;
-    use nadi_plugin::nadi_func;
 
     /// Count the number of dams upstream at each point
-    #[nadi_func(outvar = "DAMS_COUNT")]
-    fn count_dams(node: &mut NodeInner, outvar: String) -> Result<()> {
-        let mut count = 0;
+    #[node_func(outvar = "DAMS_COUNT")]
+    fn count_dams(node: &mut NodeInner, outvar: String) {
+        let mut count: i64 = 0;
         for i in node.inputs() {
-            let n = i.borrow();
+            let n = i.lock();
             let nc = n
                 .attr(&outvar)
-                .map(|a| a.as_integer())
+                .map(|a| i64::from_attr(a))
                 .flatten()
                 .unwrap_or(0);
             count += nc;
@@ -23,19 +22,18 @@ mod dams {
                 count += 1;
             }
         }
-        node.set_attr(outvar, toml::Value::Integer(count));
-        Ok(())
+        node.set_attr(&outvar, Attribute::Integer(count));
     }
 
     /// Count the number of gages upstream at each point
-    #[nadi_func(outvar = "GAGES_COUNT")]
-    fn count_gages(node: &mut NodeInner, outvar: String) -> Result<()> {
-        let mut count = 0;
+    #[node_func(outvar = "GAGES_COUNT")]
+    fn count_gages(node: &mut NodeInner, outvar: String) {
+        let mut count: i64 = 0;
         for i in node.inputs() {
-            let n = i.borrow();
+            let n = i.lock();
             let nc = n
                 .attr(&outvar)
-                .map(|a| a.as_integer())
+                .map(|a| i64::from_attr(a))
                 .flatten()
                 .unwrap_or(0);
             count += nc;
@@ -43,17 +41,16 @@ mod dams {
                 count += 1;
             }
         }
-        node.set_attr(outvar, toml::Value::Integer(count));
-        Ok(())
+        node.set_attr(&outvar, Attribute::Integer(count));
     }
 
     /// Propagage the minimum year downstream
-    #[nadi_func(write_var = "MIN_YEAR")]
-    fn min_year(node: &mut NodeInner, yearattr: String, write_var: String) -> Result<()> {
-        let mut min_yr = node.attr(&yearattr).map(|a| a.as_integer()).flatten();
+    #[node_func(write_var = "MIN_YEAR")]
+    fn min_year(node: &mut NodeInner, yearattr: String, write_var: String) {
+        let mut min_yr = node.attr(&yearattr).map(|a| i64::from_attr(a)).flatten();
         for i in node.inputs() {
-            let n = i.borrow();
-            if let Some(yr) = n.attr(&write_var).map(|a| a.as_integer()).flatten() {
+            let n = i.lock();
+            if let Some(yr) = n.attr(&write_var).map(|a| i64::from_attr(a)).flatten() {
                 min_yr = match min_yr {
                     Some(m) => {
                         if yr < m {
@@ -67,8 +64,7 @@ mod dams {
             }
         }
         if let Some(yr) = min_yr {
-            node.set_attr(write_var, toml::Value::Integer(yr));
+            node.set_attr(&write_var, Attribute::Integer(yr));
         }
-        Ok(())
     }
 }

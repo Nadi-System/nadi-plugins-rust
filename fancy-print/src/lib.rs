@@ -1,0 +1,83 @@
+use abi_stable::{
+    export_root_module,
+    prefix_type::PrefixTypeTrait,
+    sabi_extern_fn,
+    sabi_trait::prelude::TD_Opaque,
+    std_types::{
+        RBox,
+        ROption::{self, RNone, RSome},
+        RSlice, RStr, RString, RVec,
+    },
+};
+use colored::Colorize;
+use nadi_core::{
+    functions::{
+        FunctionCtx, FunctionRet, NadiFunctions, NetworkFunction, NetworkFunction_TO, NodeFunction,
+        NodeFunctionBox, NodeFunction_TO,
+    },
+    plugins::{NadiExternalPlugin, NadiExternalPlugin_Ref},
+    AttrMap, Attribute, Network,
+};
+
+#[export_root_module]
+pub fn get_library() -> NadiExternalPlugin_Ref {
+    NadiExternalPlugin {
+        register_functions,
+        plugin_name,
+    }
+    .leak_into_prefix()
+}
+
+#[sabi_extern_fn]
+fn plugin_name() -> RString {
+    "fancy_print".into()
+}
+
+#[sabi_extern_fn]
+fn register_functions(funcs: &mut NadiFunctions) {
+    funcs.register_network_function(NetworkFunction_TO::from_value(FancyPrint, TD_Opaque))
+}
+
+#[derive(Debug)]
+pub struct FancyPrint;
+
+impl NetworkFunction for FancyPrint {
+    fn name(&self) -> RString {
+        "fancy_print".into()
+    }
+
+    fn help(&self) -> RString {
+        "Fancy print a network
+"
+        .into()
+    }
+
+    fn code(&self) -> RString where {
+        "
+        for node in network.nodes() {
+            let n = node.lock();
+            print!(\"[{}] {}\", n.index(), n.name().blue());
+            if let RSome(o) = n.output() {
+                println!(\" {} {}\", \"->\".red(), o.lock().name().yellow());
+            } else {
+                println!();
+            }
+        }
+        RNone
+"
+        .into()
+    }
+
+    fn call(&self, network: &mut Network, _ctx: &FunctionCtx) -> FunctionRet {
+        for node in network.nodes() {
+            let n = node.lock();
+            print!("[{}] {}", n.index(), n.name().blue());
+            if let RSome(o) = n.output() {
+                println!(" {} {}", "->".red(), o.lock().name().yellow());
+            } else {
+                println!();
+            }
+        }
+        FunctionRet::None
+    }
+}
