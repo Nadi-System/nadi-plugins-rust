@@ -32,7 +32,7 @@ mod print_node {
     fn print_attr_csv(net: &mut Network, #[args] args: &[Attribute]) -> Result<(), String> {
         let attrs_n = args
             .iter()
-            .map(|a| String::try_from_attr(a))
+            .map(String::try_from_attr)
             .collect::<Result<Vec<String>, String>>()?;
         println!("name,{}", attrs_n.join(","));
         for node in net.nodes() {

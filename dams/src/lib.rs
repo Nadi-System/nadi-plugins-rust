@@ -14,8 +14,7 @@ mod dams {
             let n = i.lock();
             let nc = n
                 .attr(&outvar)
-                .map(|a| i64::from_attr(a))
-                .flatten()
+                .and_then(i64::from_attr)
                 .unwrap_or(0);
             count += nc;
             if !n.name().starts_with("USGS") {
@@ -33,8 +32,7 @@ mod dams {
             let n = i.lock();
             let nc = n
                 .attr(&outvar)
-                .map(|a| i64::from_attr(a))
-                .flatten()
+                .and_then(i64::from_attr)
                 .unwrap_or(0);
             count += nc;
             if n.name().starts_with("USGS") {
@@ -47,10 +45,10 @@ mod dams {
     /// Propagage the minimum year downstream
     #[node_func(write_var = "MIN_YEAR")]
     fn min_year(node: &mut NodeInner, yearattr: String, write_var: String) {
-        let mut min_yr = node.attr(&yearattr).map(|a| i64::from_attr(a)).flatten();
+        let mut min_yr = node.attr(&yearattr).and_then(i64::from_attr);
         for i in node.inputs() {
             let n = i.lock();
-            if let Some(yr) = n.attr(&write_var).map(|a| i64::from_attr(a)).flatten() {
+            if let Some(yr) = n.attr(&write_var).and_then(i64::from_attr) {
                 min_yr = match min_yr {
                     Some(m) => {
                         if yr < m {

@@ -30,7 +30,7 @@ mod errors {
     ) -> Result<f64, String> {
         let obs: &[f64] = node.try_ts(&ts1)?.try_values()?;
         let sim: &[f64] = node.try_ts(&ts2)?.try_values()?;
-        let err = calc_error(&obs, &sim, &error)?;
+        let err = calc_error(obs, sim, &error)?;
         if print {
             println!("{}:{}={}", node.name(), error, err);
         }
@@ -66,8 +66,7 @@ mod errors {
             .map(|n| {
                 n.lock()
                     .attr(attr)
-                    .map(|a| f64::from_attr_relaxed(a))
-                    .flatten()
+                    .and_then(f64::from_attr_relaxed)
                     .unwrap_or(f64::NAN)
             })
             .collect()

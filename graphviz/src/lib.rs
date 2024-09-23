@@ -22,7 +22,7 @@ mod graphviz {
         node_attr: Option<Template>,
         edge_attr: Option<Template>,
     ) -> FunctionRet {
-        let mut file = return_on_err!(File::create(&outfile));
+        let mut file = return_on_err!(File::create(outfile));
         return_on_err!(writeln!(file, "digraph {} {{", name));
         return_on_err!(writeln!(file, "{}", global_attrs));
         for node in net.nodes() {
