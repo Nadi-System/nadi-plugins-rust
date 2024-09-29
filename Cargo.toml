@@ -1,3 +1,3 @@
 [workspace]
-members = ["print_node", "streamflow", "dams", "calc_errors", "graphviz", "fancy-print"]
+members = ["print_node", "streamflow", "dams", "calc_errors", "graphviz", "fancy-print", "gnuplot"]
 resolver = "2"
