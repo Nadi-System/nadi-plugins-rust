@@ -1,0 +1,15 @@
+[package]
+name = "graphics"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+abi_stable = "0.11.3"
+anyhow = "1.0.89"
+cairo-rs = { version = "0.20.1", features = ["svg"] }
+nadi_core = {path = "../../nadi_core"}
+polars = { version = "0.41.0", features = ["lazy", "csv", "cum_agg", "temporal"] }
+string-template-plus = "0.4.3"
