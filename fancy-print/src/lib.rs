@@ -15,15 +15,16 @@ use abi_stable::{
     sabi_extern_fn,
     sabi_trait::prelude::TD_Opaque,
     std_types::{
-        ROption::{RSome}, RString,
+        ROption::RSome,
+        RResult::{self, ROk},
+        RString,
     },
 };
 use colored::Colorize;
 use nadi_core::{
-    functions::{
-        FunctionCtx, FunctionRet, NadiFunctions, NetworkFunction, NetworkFunction_TO, NodeFunction,
-    },
-    plugins::{NadiExternalPlugin, NadiExternalPlugin_Ref}, Network,
+    functions::{FunctionCtx, NadiFunctions, NetworkFunction, NetworkFunction_TO},
+    network::Network,
+    plugins::{NadiExternalPlugin, NadiExternalPlugin_Ref},
 };
 
 #[export_root_module]
@@ -45,7 +46,7 @@ fn register_functions(funcs: &mut NadiFunctions) {
     funcs.register_network_function(NetworkFunction_TO::from_value(FancyPrint, TD_Opaque))
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FancyPrint;
 
 impl NetworkFunction for FancyPrint {
@@ -59,6 +60,10 @@ impl NetworkFunction for FancyPrint {
         .into()
     }
 
+    fn signature(&self) -> RString {
+        "()".into()
+    }
+
     fn code(&self) -> RString where {
         "
         for node in network.nodes() {
@@ -70,12 +75,12 @@ impl NetworkFunction for FancyPrint {
                 println!();
             }
         }
-        RNone
+        ROk(())
 "
         .into()
     }
 
-    fn call(&self, network: &mut Network, _ctx: &FunctionCtx) -> FunctionRet {
+    fn call(&self, network: &mut Network, _ctx: &FunctionCtx) -> RResult<(), RString> {
         for node in network.nodes() {
             let n = node.lock();
             print!("[{}] {}", n.index(), n.name().blue());
@@ -85,6 +90,6 @@ impl NetworkFunction for FancyPrint {
                 println!();
             }
         }
-        FunctionRet::None
+        ROk(())
     }
 }

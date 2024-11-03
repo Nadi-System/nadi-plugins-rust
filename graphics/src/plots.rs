@@ -1,12 +1,11 @@
 use abi_stable::std_types::{RSome, Tuple2};
-use nadi_core::attrs::{FromAttribute, FromAttributeRelaxed};
 use nadi_core::nadi_plugin::network_func;
+use nadi_core::prelude::*;
+use nadi_core::string_template::Template;
 use nadi_core::table::ColumnAlign;
 use nadi_core::table::Table;
-use nadi_core::{AttrMap, Attribute, Network};
 use std::path::PathBuf;
 use std::str::FromStr;
-use string_template_plus::Template;
 
 #[derive(Debug)]
 pub struct NetworkPlotConfig {

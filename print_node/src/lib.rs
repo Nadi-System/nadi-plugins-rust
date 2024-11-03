@@ -3,9 +3,8 @@ use nadi_core::nadi_plugin::nadi_plugin;
 #[nadi_plugin]
 mod print_node {
     use abi_stable::std_types::RSome;
-    use nadi_core::attrs::{Attribute, FromAttribute};
     use nadi_core::nadi_plugin::{network_func, node_func};
-    use nadi_core::{Network, NodeInner};
+    use nadi_core::prelude::*;
 
     /// Print the node with its inputs and outputs
     #[node_func]

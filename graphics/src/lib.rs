@@ -7,16 +7,170 @@ mod timeseries;
 mod graphics {
     use super::plots::*;
     use super::timeseries;
-    use abi_stable::std_types::{RSome, Tuple2};
-    use nadi_core::attrs::{FromAttribute, FromAttributeRelaxed};
+    use abi_stable::external_types::RMutex;
+    use abi_stable::std_types::{RArc, RSome, RString, Tuple2};
+    use anyhow::{bail, Context};
     use nadi_core::nadi_plugin::network_func;
+    use nadi_core::prelude::*;
+    use nadi_core::string_template::Template;
     use nadi_core::table::ColumnAlign;
     use nadi_core::table::Table;
-    use nadi_core::{AttrMap, Attribute, Network};
+    use nadi_core::timeseries::TimeSeriesValues;
     use polars::prelude::*;
     use std::path::PathBuf;
     use std::str::FromStr;
-    use string_template_plus::Template;
+
+    /// Count the number of na values in CSV file for each nodes in a network
+    ///
+    /// # Arguments
+    /// - `file`: Input CSV file path to read (should have column with
+    ///   node names for all nodes)
+    /// - `name`: Name of the timeseries
+    /// - `date_col`: Date Column name
+    /// - `timefmt`: date time format, if you only have date, but have time on format string, it will panic
+    /// - `data_type`: Type of the data to cast into
+    #[network_func(date_col = "date", timefmt = "%Y-%m-%d", data_type = "Floats")]
+    fn csv_load_ts(
+        net: &mut Network,
+        file: PathBuf,
+        name: String,
+        date_col: String,
+        timefmt: String,
+        data_type: String,
+    ) -> anyhow::Result<()> {
+        let columns: Vec<&str> = net.node_names().collect();
+        let df: DataFrame = LazyCsvReader::new(file)
+            .with_has_header(true)
+            .with_try_parse_dates(true)
+            .finish()?
+            .lazy()
+            .select([col(&date_col), cols(&columns)])
+            .collect()?;
+
+        let values: Vec<TimeSeriesValues> = match data_type.as_str() {
+            "Floats" => {
+                let df2 = df
+                    .clone()
+                    .lazy()
+                    .select([cols(&columns).cast(DataType::Float64).fill_null(lit(0.0))])
+                    .collect()?;
+                let mut vals = vec![];
+                for col in &columns {
+                    let s = df2.column(col)?;
+                    let v: Vec<f64> = s.f64()?.into_no_null_iter().collect();
+                    vals.push(TimeSeriesValues::floats(v));
+                }
+                vals
+            }
+            "Integers" => {
+                let df2 = df
+                    .clone()
+                    .lazy()
+                    .select([cols(&columns).cast(DataType::Int64).fill_null(lit(0))])
+                    .collect()?;
+                let mut vals = vec![];
+                for col in &columns {
+                    let s = df2.column(col)?;
+                    let v: Vec<i64> = s.i64()?.into_no_null_iter().collect();
+                    vals.push(TimeSeriesValues::integers(v));
+                }
+                vals
+            }
+            "Strings" => {
+                let df2 = df
+                    .clone()
+                    .lazy()
+                    .select([cols(&columns)
+                        .cast(DataType::String)
+                        .fill_null(lit(String::new()))])
+                    .collect()?;
+                let mut vals = vec![];
+                for col in &columns {
+                    let s = df2.column(col)?;
+                    let v: Vec<&str> = s.str()?.into_no_null_iter().collect();
+                    vals.push(TimeSeriesValues::strings(
+                        v.into_iter().map(RString::from).collect(),
+                    ));
+                }
+                vals
+            }
+            "Booleans" => {
+                let df2 = df
+                    .clone()
+                    .lazy()
+                    .select([cols(&columns).cast(DataType::Boolean).fill_null(lit(false))])
+                    .collect()?;
+                let mut vals = vec![];
+                for col in &columns {
+                    let s = df2.column(col)?;
+                    let v: Vec<bool> = s.bool()?.into_no_null_iter().collect();
+                    vals.push(TimeSeriesValues::booleans(v));
+                }
+                vals
+            }
+            // "Dates" => {
+            //     let df2 = df
+            //         .clone()
+            //         .lazy()
+            //         .select([cols(&columns).cast(DataType::Date)])
+            //         .collect()?;
+            // }
+            // "Times" => {
+            //     let df2 = df
+            //         .clone()
+            //         .lazy()
+            //         .select([cols(&columns).cast(DataType::Time)])
+            //         .collect()?;
+            // }
+            // "DateTimes" => {
+            //     let df2 = df
+            //         .clone()
+            //         .lazy()
+            //         .select([cols(&columns).cast(DataType::Datetime(TimeUnit::Milliseconds, None))])
+            //         .collect()?;
+            // }
+            _ => bail!("{data_type} is not supported or is not a recognized data type"),
+        };
+
+        // converting the dates to timeline that all timeseries can share
+        let dates = df
+            .clone()
+            .lazy()
+            .select([col(&date_col)
+                .dt()
+                .timestamp(TimeUnit::Milliseconds)
+                .alias("timestamp")])
+            .collect()?;
+
+        let dt_col = dates.column("timestamp")?;
+        let start = dt_col.min::<i64>()?.context("No minimum date")?;
+        let end = dt_col.max::<i64>()?.context("No maximum date")?;
+        let step = (end - start) / dt_col.len() as i64;
+
+        let dates = df
+            .clone()
+            .lazy()
+            .select([col(&date_col).dt().strftime(&timefmt)])
+            .collect()?;
+        let dt_col = dates.column(&date_col)?;
+        let dates: Vec<&str> = dt_col.str()?.into_no_null_iter().collect();
+        let timeline = nadi_core::timeseries::TimeLineInner::new(
+            start,
+            end,
+            step,
+            true,
+            dates.into_iter().map(String::from).collect(),
+            &timefmt,
+        );
+        let timeline = RArc::new(RMutex::new(timeline));
+
+        for (node, vals) in net.nodes().zip(values) {
+            let mut node = node.lock();
+            let ts = nadi_core::timeseries::TimeSeries::new(timeline.clone(), vals);
+            node.set_ts(&name, ts);
+        }
+        Ok(())
+    }
 
     /// Count the number of na values in CSV file for each nodes in a network
     ///
@@ -84,8 +238,8 @@ mod graphics {
         net: &mut Network,
         csvfile: PathBuf,
         outfile: PathBuf,
-        date_col: String,
         label: Template,
+        date_col: String,
         #[relaxed] config: NetworkPlotConfig,
         blocks_width: f64,
         fit: bool,
@@ -207,9 +361,9 @@ mod graphics {
     #[network_func(config = NetworkPlotConfig::default(), fit = false)]
     fn table_to_svg(
         net: &mut Network,
+        outfile: PathBuf,
         table: Option<PathBuf>,
         template: Option<String>,
-        outfile: PathBuf,
         #[relaxed] config: NetworkPlotConfig,
         fit: bool,
     ) -> anyhow::Result<()> {

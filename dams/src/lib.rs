@@ -8,14 +8,11 @@ mod dams {
 
     /// Count the number of dams upstream at each point
     #[node_func(outvar = "DAMS_COUNT")]
-    fn count_dams(node: &mut NodeInner, outvar: String) {
+    fn count_dams(node: &mut NodeInner, outvar: &str) {
         let mut count: i64 = 0;
         for i in node.inputs() {
             let n = i.lock();
-            let nc = n
-                .attr(&outvar)
-                .and_then(i64::from_attr)
-                .unwrap_or(0);
+            let nc = n.attr(outvar).and_then(i64::from_attr).unwrap_or(0);
             count += nc;
             if !n.name().starts_with("USGS") {
                 count += 1;
@@ -26,14 +23,11 @@ mod dams {
 
     /// Count the number of gages upstream at each point
     #[node_func(outvar = "GAGES_COUNT")]
-    fn count_gages(node: &mut NodeInner, outvar: String) {
+    fn count_gages(node: &mut NodeInner, outvar: &str) {
         let mut count: i64 = 0;
         for i in node.inputs() {
             let n = i.lock();
-            let nc = n
-                .attr(&outvar)
-                .and_then(i64::from_attr)
-                .unwrap_or(0);
+            let nc = n.attr(outvar).and_then(i64::from_attr).unwrap_or(0);
             count += nc;
             if n.name().starts_with("USGS") {
                 count += 1;
@@ -44,11 +38,11 @@ mod dams {
 
     /// Propagage the minimum year downstream
     #[node_func(write_var = "MIN_YEAR")]
-    fn min_year(node: &mut NodeInner, yearattr: String, write_var: String) {
-        let mut min_yr = node.attr(&yearattr).and_then(i64::from_attr);
+    fn min_year(node: &mut NodeInner, yearattr: &str, write_var: &str) {
+        let mut min_yr = node.attr(yearattr).and_then(i64::from_attr);
         for i in node.inputs() {
             let n = i.lock();
-            if let Some(yr) = n.attr(&write_var).and_then(i64::from_attr) {
+            if let Some(yr) = n.attr(write_var).and_then(i64::from_attr) {
                 min_yr = match min_yr {
                     Some(m) => {
                         if yr < m {
@@ -62,7 +56,7 @@ mod dams {
             }
         }
         if let Some(yr) = min_yr {
-            node.set_attr(&write_var, Attribute::Integer(yr));
+            node.set_attr(write_var, Attribute::Integer(yr));
         }
     }
 }

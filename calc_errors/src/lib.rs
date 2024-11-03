@@ -3,14 +3,11 @@ use nadi_core::nadi_plugin::nadi_plugin;
 #[nadi_plugin]
 mod errors {
     use nadi_core::nadi_plugin::{network_func, node_func};
-    use nadi_core::{
-        attrs::{Attribute, FromAttributeRelaxed},
-        Network, NodeInner,
-    };
+    use nadi_core::prelude::*;
 
     /** Calculate Error from two timeseries values in the node
 
-    It calculates the error using two attribute values from all the nodes.
+    It calculates the error between two timeseries values from the node.
 
     Arguments:
     - ts1: String      Timeseries value to use as actual value
@@ -19,23 +16,65 @@ mod errors {
     - outattr: String  Attribute to save the output on [default: ERROR]
     - print: bool      Print the output to stdout [default: false]
     */
-    #[node_func(error = "rmse", outattr = "ERROR", print = false)]
+    #[node_func(error = "rmse", print = true)]
     fn calc_ts_error(
         node: &mut NodeInner,
-        ts1: String,
-        ts2: String,
-        error: String,
-        outattr: String,
+        ts1: &str,
+        ts2: &str,
+        error: &str,
+        outattr: Option<&str>,
         print: bool,
     ) -> Result<f64, String> {
         let obs: &[f64] = node.try_ts(&ts1)?.try_values()?;
         let sim: &[f64] = node.try_ts(&ts2)?.try_values()?;
         let err = calc_error(obs, sim, &error)?;
-        if print {
+        if let Some(attr) = outattr {
+            node.set_attr(&attr, Attribute::Float(err));
+        } else if print {
             println!("{}:{}={}", node.name(), error, err);
         }
-        node.set_attr(&outattr, Attribute::Float(err));
         Ok(err)
+    }
+
+    /** Calculate Error from two timeseries values in the node
+
+    It calculates the error between two timeseries values from the node.
+
+    // Arguments:
+    // - ts1: String      Timeseries value to use as actual value
+    // - ts2: String      Timeseries value to be used to calculate the error
+    // - error: String    Error type: rmse/nrmse/abserr/nse [default: rmse]
+    // - outattr: String  Attribute to save the output on [default: ERROR]
+    // - print: bool      Print the output to stdout [default: false]
+    // */
+    #[node_func(errors = vec!["rmse".to_string()], outattr = "ERROR", print = false)]
+    fn calc_ts_errors(
+        node: &mut NodeInner,
+        ts1: &String,
+        ts2: &String,
+        errors: &[String],
+        outattr: &String,
+        print: bool,
+    ) -> Result<(), String> {
+        let mut err_vals = Vec::new();
+        {
+            // this block is for isolating the borrow of the node; so
+            // that we can borrow mut node later
+            let obs: &[f64] = node.try_ts(&ts1)?.try_values()?;
+            let sim: &[f64] = node.try_ts(&ts2)?.try_values()?;
+            for error in errors {
+                let err = calc_error(obs, sim, error)?;
+                if print {
+                    println!("{}:{}={}", node.name(), error, err);
+                }
+                err_vals.push(err);
+            }
+        }
+
+        for (error, err) in errors.iter().zip(err_vals) {
+            node.set_attr(&format!("{outattr}_{error}"), Attribute::Float(err));
+        }
+        Ok(())
     }
 
     /** Calculate Error from two attribute values in the network

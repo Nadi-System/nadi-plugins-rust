@@ -1,10 +1,10 @@
 use crate::plots::*;
 use abi_stable::std_types::RSome;
-use nadi_core::Network;
+use nadi_core::prelude::*;
+use nadi_core::string_template::Template;
 use polars::df;
 use polars::prelude::*;
 use std::path::PathBuf;
-use string_template_plus::Template;
 
 #[derive(Debug, Default)]
 pub struct Block {

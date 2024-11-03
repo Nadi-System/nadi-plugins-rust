@@ -5,9 +5,13 @@ mod gnuplot {
     use abi_stable::std_types::Tuple2;
     use nadi_core::attrs::FromAttribute;
     use nadi_core::nadi_plugin::network_func;
-    use nadi_core::{AttrMap, Attribute, Network};
-    use std::{fs::File, io::Write, path::PathBuf};
-    use string_template_plus::Template;
+    use nadi_core::prelude::*;
+    use nadi_core::string_template::Template;
+    use std::{
+        fs::File,
+        io::Write,
+        path::{Path, PathBuf},
+    };
 
     #[derive(Debug, Default)]
     struct GnuplotConfig {
@@ -55,11 +59,11 @@ mod gnuplot {
     fn plot_timeseries(
         net: &mut Network,
         csvfile: Template,
-        datecol: String,
-        datacol: String,
-        outfile: PathBuf,
-        timefmt: String,
-        config: GnuplotConfig,
+        datecol: &str,
+        datacol: &str,
+        outfile: &Path,
+        timefmt: &str,
+        config: &GnuplotConfig,
         skip_missing: bool,
     ) -> anyhow::Result<()> {
         let mut plot_lines = Vec::with_capacity(net.nodes_count());
@@ -90,10 +94,10 @@ set mxtics 6
 set multiplot layout {nodes_count},1
 "
         )?;
-        if let Some(term) = config.terminal {
+        if let Some(term) = &config.terminal {
             writeln!(file, "set terminal {term}")?;
         }
-        if let Some(out) = config.outfile {
+        if let Some(out) = &config.outfile {
             writeln!(file, "set output {out:?}")?;
         }
         writeln!(file, "{}", config.preamble)?;
