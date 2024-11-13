@@ -7,9 +7,9 @@ mod errors {
 
     /** Calculate Error from two timeseries values in the node
 
-    It calculates the error between two timeseries values from the node.
+    It calculates the error between two timeseries values from the node
 
-    Arguments:
+    # Arguments:
     - ts1: String      Timeseries value to use as actual value
     - ts2: String      Timeseries value to be used to calculate the error
     - error: String    Error type: rmse/nrmse/abserr/nse [default: rmse]
@@ -40,13 +40,13 @@ mod errors {
 
     It calculates the error between two timeseries values from the node.
 
-    // Arguments:
-    // - ts1: String      Timeseries value to use as actual value
-    // - ts2: String      Timeseries value to be used to calculate the error
-    // - error: String    Error type: rmse/nrmse/abserr/nse [default: rmse]
-    // - outattr: String  Attribute to save the output on [default: ERROR]
-    // - print: bool      Print the output to stdout [default: false]
-    // */
+    Arguments:
+    - ts1: String      Timeseries value to use as actual value
+    - ts2: String      Timeseries value to be used to calculate the error
+    - error: String    Error type: rmse/nrmse/abserr/nse [default: rmse]
+    - outattr: String  Attribute to save the output on [default: ERROR]
+    - print: bool      Print the output to stdout [default: false]
+    */
     #[node_func(errors = vec!["rmse".to_string()], outattr = "ERROR", print = false)]
     fn calc_ts_errors(
         node: &mut NodeInner,

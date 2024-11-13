@@ -43,7 +43,10 @@ fn plugin_name() -> RString {
 
 #[sabi_extern_fn]
 fn register_functions(funcs: &mut NadiFunctions) {
-    funcs.register_network_function(NetworkFunction_TO::from_value(FancyPrint, TD_Opaque))
+    funcs.register_network_function(
+        "fancy_print",
+        NetworkFunction_TO::from_value(FancyPrint, TD_Opaque),
+    )
 }
 
 #[derive(Debug, Clone)]

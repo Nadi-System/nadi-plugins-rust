@@ -257,13 +257,14 @@ mod graphics {
     }
 
     /// Create a SVG file with the given network structure
-    #[network_func(config = NetworkPlotConfig::default(), fit = false)]
+    #[network_func(config = NetworkPlotConfig::default(), fit = false, highlight = Vec::new())]
     fn export_svg(
         net: &mut Network,
         outfile: PathBuf,
         #[relaxed] config: NetworkPlotConfig,
         fit: bool,
         label: Option<Template>,
+	highlight: &[usize],
     ) -> anyhow::Result<()> {
         let n = net.nodes_count();
         if n == 0 {
@@ -307,7 +308,6 @@ mod graphics {
         ctx.set_line_width(1.0);
         ctx.set_font_size(config.fontsize);
         ctx.set_font_face(&config.fontface);
-        ctx.set_source_rgb(0.5, 0.5, 1.0);
 
         let offset = width - twidth;
 
@@ -318,6 +318,7 @@ mod graphics {
                 let y = height - (n.index() + 1) as f64 * dely;
                 let x = n.level() as f64 * delx + delx / 2.0;
 
+		ctx.set_source_rgb(0.5, 0.5, 1.0);
                 if let RSome(o) = n.output() {
                     let o = o.lock();
                     let yo = height - (o.index() + 1) as f64 * dely;
@@ -346,6 +347,11 @@ mod graphics {
                     ctx.fill()?;
                     ctx.stroke()?;
                 }
+		if highlight.contains(&n.index()){
+		    ctx.set_source_rgb(1.0, 0.5, 0.5);
+		} else {
+		    ctx.set_source_rgb(0.5, 0.5, 1.0);
+		}
                 ctx.move_to(x + config.radius, y);
                 ctx.arc(x, y, config.radius, 0.0, 2.0 * 3.1416);
                 ctx.fill()?;
@@ -358,7 +364,7 @@ mod graphics {
     }
 
     /// Create a SVG file with the given network structure
-    #[network_func(config = NetworkPlotConfig::default(), fit = false)]
+    #[network_func(config = NetworkPlotConfig::default(), fit = false, highlight = Vec::new())]
     fn table_to_svg(
         net: &mut Network,
         outfile: PathBuf,
@@ -366,6 +372,7 @@ mod graphics {
         template: Option<String>,
         #[relaxed] config: NetworkPlotConfig,
         fit: bool,
+	highlight: &[String],
     ) -> anyhow::Result<()> {
         let table = match (table, template) {
             (Some(t), None) => nadi_core::table::Table::from_file(t)?,
@@ -373,6 +380,7 @@ mod graphics {
             (Some(_), Some(_)) => return Err(anyhow::Error::msg("table and template both given")),
             (None, None) => return Err(anyhow::Error::msg("neither table nor template given")),
         };
-        export_svg_table(net, table, outfile, config, fit)
+	let highlight: Vec<usize> = highlight.iter().map(|n| net.node_by_name(n).context("Node not found").map(|n| n.lock().index())).collect::<anyhow::Result<Vec<usize>>>()?;
+        export_svg_table(net, table, outfile, config, fit, &highlight)
     }
 }

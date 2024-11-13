@@ -77,7 +77,6 @@ pub fn csv_data_blocks_svg(
 
     let block_start = width - blocks_width - config.offset / 2.0;
     let label_start = width - twidth + config.offset;
-    println!("{label_start}");
     let blocks = csv_data_blocks(&net, csv, date_col)?;
     let blocks_min = blocks
         .blocks
