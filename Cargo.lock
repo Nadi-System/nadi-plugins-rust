@@ -95,9 +95,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.89"
+version = "1.0.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86fdf8605db99b54d3cd748a44c6d04df638eb5dafb219b135d0149bd0db01f6"
+checksum = "4c95c10ba0b00a02636238b814946408b1322d5ac4760326e6fb8ec956d85775"
 
 [[package]]
 name = "approx"
@@ -742,7 +742,6 @@ name = "gnuplot"
 version = "0.4.0"
 dependencies = [
  "abi_stable",
- "anyhow",
  "nadi_core",
 ]
 
@@ -807,6 +806,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3d1354bf6b7235cb4a0576c2619fd4ed18183f689b12b006a0ee7329eeff9a5"
 dependencies = [
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "html"
+version = "0.1.0"
+dependencies = [
+ "abi_stable",
+ "anyhow",
+ "nadi_core",
 ]
 
 [[package]]

@@ -2,7 +2,7 @@ use nadi_core::nadi_plugin::nadi_plugin;
 
 #[nadi_plugin]
 mod gnuplot {
-    use abi_stable::std_types::Tuple2;
+    use nadi_core::abi_stable::std_types::Tuple2;
     use nadi_core::attrs::FromAttribute;
     use nadi_core::nadi_plugin::network_func;
     use nadi_core::prelude::*;
@@ -65,11 +65,11 @@ mod gnuplot {
         timefmt: &str,
         config: &GnuplotConfig,
         skip_missing: bool,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), String> {
         let mut plot_lines = Vec::with_capacity(net.nodes_count());
         for node in net.nodes() {
             let node = node.lock();
-            let path = node.render(&csvfile)?;
+            let path = node.render(&csvfile).map_err(|e| e.to_string())?;
             if skip_missing && !PathBuf::from(&path).exists() {
                 continue;
             }
@@ -77,6 +77,9 @@ mod gnuplot {
                 "plot {path:?} using {datecol:?}:{datacol:?} with lines"
             ));
         }
+	write_to_outfile(plot_lines, outfile, timefmt, config).map_err(|e| e.to_string())
+    }
+    fn write_to_outfile(plot_lines: Vec<String> ,outfile: &Path, timefmt: &str, config: &GnuplotConfig) -> Result<(), std::io::Error>{
         let nodes_count = plot_lines.len();
 
         let mut file = File::create(outfile)?;
