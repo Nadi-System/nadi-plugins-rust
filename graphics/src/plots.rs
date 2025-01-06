@@ -206,7 +206,7 @@ pub fn export_svg_table(
             let y = height - (n.index() + 1) as f64 * dely;
             let x = n.level() as f64 * delx + config.offset / 2.0;
 
-	    ctx.set_source_rgb(0.35, 0.35, 0.6);
+            ctx.set_source_rgb(0.35, 0.35, 0.6);
             if let RSome(o) = n.output() {
                 let o = o.lock();
                 let yo = height - (o.index() + 1) as f64 * dely;
@@ -235,11 +235,11 @@ pub fn export_svg_table(
                 ctx.fill()?;
                 ctx.stroke()?;
             }
-	    if highlight.contains(&n.index()){
-		ctx.set_source_rgb(0.6, 0.35, 0.35);
-	    } else {
-		ctx.set_source_rgb(0.35, 0.35, 0.6);
-	    }
+            if highlight.contains(&n.index()) {
+                ctx.set_source_rgb(0.6, 0.35, 0.35);
+            } else {
+                ctx.set_source_rgb(0.35, 0.35, 0.6);
+            }
             ctx.move_to(x + config.radius, y);
             ctx.arc(x, y, config.radius, 0.0, 2.0 * 3.1416);
             ctx.fill()?;

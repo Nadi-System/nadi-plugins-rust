@@ -3,6 +3,7 @@ use nadi_core::nadi_plugin::nadi_plugin;
 #[nadi_plugin]
 mod graphviz {
     use abi_stable::std_types::ROption::RSome;
+    use nadi_core::attrs::HasAttributes;
     use nadi_core::functions::FunctionRet;
     use nadi_core::nadi_plugin::network_func;
     use nadi_core::string_template::Template;

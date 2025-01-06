@@ -2,7 +2,6 @@ use crate::plots::*;
 use abi_stable::std_types::RSome;
 use nadi_core::prelude::*;
 use nadi_core::string_template::Template;
-use polars::df;
 use polars::prelude::*;
 use std::path::PathBuf;
 
@@ -15,8 +14,8 @@ pub struct Block {
 #[derive(Debug, Default)]
 pub struct Blocks {
     pub blocks: Vec<Vec<Block>>,
-    pub start: i64,
-    pub end: i64,
+    pub _start: i64,
+    pub _end: i64,
 }
 
 /// Create a SVG file with the given network structure
@@ -81,15 +80,15 @@ pub fn csv_data_blocks_svg(
     let blocks_min = blocks
         .blocks
         .iter()
-        .map(|bs| bs.iter().map(|b| b.start).min().unwrap())
+        .map(|bs| bs.iter().map(|b| b.start).min().expect("No minimum"))
         .min()
-        .unwrap();
+        .expect("No minimum");
     let blocks_max = blocks
         .blocks
         .iter()
-        .map(|bs| bs.iter().map(|b| b.start).max().unwrap())
+        .map(|bs| bs.iter().map(|b| b.start).max().expect("No maximum"))
         .max()
-        .unwrap();
+        .expect("No maximum");
     let blocks_diff = blocks_max - blocks_min;
     let blocks: Vec<Vec<(f64, f64)>> = blocks
         .blocks
@@ -212,17 +211,17 @@ pub fn csv_data_blocks(net: &Network, file: PathBuf, date_col: String) -> anyhow
             //         .with_nulls_last(true),
             // )
             .collect()
-            .unwrap();
+            .expect("Date blocks collection failed");
         let mut col_iters = dates
             .columns(["start", "end"])?
             .iter()
             .map(|s| Ok(s.i64()?.into_iter()))
             .collect::<anyhow::Result<Vec<_>>>()?;
         let mut blks = Vec::<Block>::new();
-        for row in 0..dates.height() {
+        for _ in 0..dates.height() {
             let mut blocks_data = [0; 2];
             for (i, col) in col_iters.iter_mut().enumerate() {
-                let val = col.next().unwrap().unwrap();
+                let val = col.next().expect("Next 1").expect("Next 2");
                 blocks_data[i] = val;
             }
             blks.push(Block {
@@ -237,7 +236,7 @@ pub fn csv_data_blocks(net: &Network, file: PathBuf, date_col: String) -> anyhow
 
 fn draw_blocks(
     ctx: &cairo::Context,
-    x0: f64,
+    _x0: f64,
     y0: f64,
     a: f64,
     blocks: &[(f64, f64)],

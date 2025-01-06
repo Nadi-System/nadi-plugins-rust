@@ -4,6 +4,7 @@ use nadi_core::nadi_plugin::nadi_plugin;
 mod streamflow {
     use nadi_core::nadi_plugin::node_func;
     use nadi_core::node::NodeInner;
+    use nadi_core::timeseries::HasTimeSeries;
 
     /// Check the given streamflow timeseries for negative values
     #[node_func]

@@ -1,20 +1,20 @@
 use nadi_core::nadi_plugin::nadi_plugin;
 
+mod colors;
 mod plots;
 mod timeseries;
 
 #[nadi_plugin]
 mod graphics {
+    use super::colors::AttrColor;
     use super::plots::*;
     use super::timeseries;
     use abi_stable::external_types::RMutex;
-    use abi_stable::std_types::{RArc, RSome, RString, Tuple2};
+    use abi_stable::std_types::{RArc, RSome, RString};
     use anyhow::{bail, Context};
-    use nadi_core::nadi_plugin::network_func;
+    use nadi_core::nadi_plugin::{network_func, node_func};
     use nadi_core::prelude::*;
     use nadi_core::string_template::Template;
-    use nadi_core::table::ColumnAlign;
-    use nadi_core::table::Table;
     use nadi_core::timeseries::TimeSeriesValues;
     use polars::prelude::*;
     use std::path::PathBuf;
@@ -206,7 +206,7 @@ mod graphics {
                 net.node_by_name(col)
                     .expect("columns var was extracted from node names")
                     .lock()
-                    .set_attr(&a, Attribute::Integer(nas))
+                    .set_attr(&a, Attribute::Integer(nas));
             });
         } else {
             let max_len: usize = columns.iter().map(|c| c.len()).max().unwrap_or_default();
@@ -257,6 +257,70 @@ mod graphics {
     }
 
     /// Create a SVG file with the given network structure
+    #[node_func(height = 80.0, width = 80.0, margin = 10.0)]
+    fn attr_fraction_svg(
+        node: &mut NodeInner,
+        attr: &str,
+        outfile: &Template,
+        color: &AttrColor,
+        height: f64,
+        width: f64,
+        margin: f64,
+    ) -> anyhow::Result<()> {
+        let outfile = PathBuf::from(node.render(outfile)?);
+        let color = color.clone().color().context("Invalid color argument")?;
+        let val: f64 = node.try_attr(attr).map_err(anyhow::Error::msg)?;
+        let mut val_out = val;
+        if let RSome(o) = node.output() {
+            val_out = o.lock().try_attr(attr).map_err(anyhow::Error::msg)?;
+        }
+        let val_inps: Vec<f64> = node
+            .inputs()
+            .iter()
+            .map(|i| i.lock().try_attr(attr))
+            .collect::<Result<Vec<f64>, String>>()
+            .map_err(anyhow::Error::msg)?;
+        let val_inp = val_inps.iter().sum::<f64>();
+        let outfrac = (val / val_out).clamp(0.0, 1.0);
+        let infrac = (val_inp / val).clamp(0.0, 1.0);
+        let infracs: Vec<f64> = val_inps
+            .iter()
+            .map(|i| (i / val_inp).clamp(0.0, 1.0))
+            .collect();
+
+        let mut surf = cairo::SvgSurface::new::<&std::path::Path>(
+            width + margin * 2.0,
+            height + margin * 2.0,
+            Some(&outfile),
+        )?;
+        let ctx = cairo::Context::new(&mut surf)?;
+        ctx.set_hairline(true);
+        ctx.set_source_rgb(0.5, 0.5, 1.0);
+        ctx.rectangle(margin, margin, width, height);
+        ctx.fill()?;
+        color.set(&ctx);
+        // ctx.set_source_rgb(0.5, 1.0, 0.5);
+        ctx.rectangle(margin, margin, width, height * outfrac);
+        ctx.fill()?;
+        ctx.set_source_rgb(1.0, 0.5, 0.5);
+        ctx.rectangle(margin, margin, width * infrac, height * outfrac);
+        ctx.fill()?;
+        ctx.set_source_rgb(1.0, 0.25, 0.25);
+        let mut pos = margin;
+        let mut alt = true;
+        for inf in infracs {
+            let pos2 = height * outfrac * inf;
+            if alt {
+                ctx.rectangle(margin, pos, width * infrac, pos2);
+                ctx.fill()?;
+            }
+            alt = !alt;
+            pos += pos2;
+        }
+        Ok(())
+    }
+
+    /// Create a SVG file with the given network structure
     #[network_func(config = NetworkPlotConfig::default(), fit = false, highlight = Vec::new())]
     fn export_svg(
         net: &mut Network,
@@ -264,7 +328,7 @@ mod graphics {
         #[relaxed] config: NetworkPlotConfig,
         fit: bool,
         label: Option<Template>,
-	highlight: &[usize],
+        highlight: &[usize],
     ) -> anyhow::Result<()> {
         let n = net.nodes_count();
         if n == 0 {
@@ -318,7 +382,7 @@ mod graphics {
                 let y = height - (n.index() + 1) as f64 * dely;
                 let x = n.level() as f64 * delx + delx / 2.0;
 
-		ctx.set_source_rgb(0.5, 0.5, 1.0);
+                ctx.set_source_rgb(0.5, 0.5, 1.0);
                 if let RSome(o) = n.output() {
                     let o = o.lock();
                     let yo = height - (o.index() + 1) as f64 * dely;
@@ -347,11 +411,11 @@ mod graphics {
                     ctx.fill()?;
                     ctx.stroke()?;
                 }
-		if highlight.contains(&n.index()){
-		    ctx.set_source_rgb(1.0, 0.5, 0.5);
-		} else {
-		    ctx.set_source_rgb(0.5, 0.5, 1.0);
-		}
+                if highlight.contains(&n.index()) {
+                    ctx.set_source_rgb(1.0, 0.5, 0.5);
+                } else {
+                    ctx.set_source_rgb(0.5, 0.5, 1.0);
+                }
                 ctx.move_to(x + config.radius, y);
                 ctx.arc(x, y, config.radius, 0.0, 2.0 * 3.1416);
                 ctx.fill()?;
@@ -372,7 +436,7 @@ mod graphics {
         template: Option<String>,
         #[relaxed] config: NetworkPlotConfig,
         fit: bool,
-	highlight: &[String],
+        highlight: &[String],
     ) -> anyhow::Result<()> {
         let table = match (table, template) {
             (Some(t), None) => nadi_core::table::Table::from_file(t)?,
@@ -380,7 +444,14 @@ mod graphics {
             (Some(_), Some(_)) => return Err(anyhow::Error::msg("table and template both given")),
             (None, None) => return Err(anyhow::Error::msg("neither table nor template given")),
         };
-	let highlight: Vec<usize> = highlight.iter().map(|n| net.node_by_name(n).context("Node not found").map(|n| n.lock().index())).collect::<anyhow::Result<Vec<usize>>>()?;
+        let highlight: Vec<usize> = highlight
+            .iter()
+            .map(|n| {
+                net.node_by_name(n)
+                    .context("Node not found")
+                    .map(|n| n.lock().index())
+            })
+            .collect::<anyhow::Result<Vec<usize>>>()?;
         export_svg_table(net, table, outfile, config, fit, &highlight)
     }
 }

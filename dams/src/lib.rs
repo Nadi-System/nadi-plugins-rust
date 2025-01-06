@@ -2,7 +2,7 @@ use nadi_core::nadi_plugin::nadi_plugin;
 
 #[nadi_plugin]
 mod dams {
-    use nadi_core::attrs::{Attribute, FromAttribute};
+    use nadi_core::attrs::{Attribute, FromAttribute, HasAttributes};
     use nadi_core::nadi_plugin::node_func;
     use nadi_core::node::NodeInner;
 
