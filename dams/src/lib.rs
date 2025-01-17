@@ -6,37 +6,19 @@ mod dams {
     use nadi_core::nadi_plugin::node_func;
     use nadi_core::node::NodeInner;
 
-    /// Count the number of dams upstream at each point
-    #[node_func(outvar = "DAMS_COUNT")]
-    fn count_dams(node: &mut NodeInner, outvar: &str) {
-        let mut count: i64 = 0;
+    /// Count the number of nodes upstream at each point that satisfies a certain condition
+    #[node_func]
+    fn count_node_if(node: &mut NodeInner, count_attr: &str, cond: bool) -> Attribute {
+        let mut count = cond as i64;
         for i in node.inputs() {
             let n = i.lock();
-            let nc = n.attr(outvar).and_then(i64::from_attr).unwrap_or(0);
+            let nc = n.attr(count_attr).and_then(i64::from_attr).unwrap_or(0);
             count += nc;
-            if !n.name().starts_with("USGS") {
-                count += 1;
-            }
         }
-        node.set_attr(&outvar, Attribute::Integer(count));
+        Attribute::Integer(count)
     }
 
-    /// Count the number of gages upstream at each point
-    #[node_func(outvar = "GAGES_COUNT")]
-    fn count_gages(node: &mut NodeInner, outvar: &str) {
-        let mut count: i64 = 0;
-        for i in node.inputs() {
-            let n = i.lock();
-            let nc = n.attr(outvar).and_then(i64::from_attr).unwrap_or(0);
-            count += nc;
-            if n.name().starts_with("USGS") {
-                count += 1;
-            }
-        }
-        node.set_attr(&outvar, Attribute::Integer(count));
-    }
-
-    /// Propagage the minimum year downstream
+    /// Propagate the minimum year downstream
     #[node_func(write_var = "MIN_YEAR")]
     fn min_year(node: &mut NodeInner, yearattr: &str, write_var: &str) {
         let mut min_yr = node.attr(yearattr).and_then(i64::from_attr);

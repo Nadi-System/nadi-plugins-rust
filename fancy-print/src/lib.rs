@@ -14,11 +14,13 @@ use abi_stable::{
     prefix_type::PrefixTypeTrait,
     sabi_extern_fn,
     sabi_trait::prelude::TD_Opaque,
-    std_types::{ROption::RSome, RString},
+    std_types::{ROption::RSome, RString, RVec},
 };
 use colored::Colorize;
 use nadi_core::{
-    functions::{FunctionCtx, FunctionRet, NadiFunctions, NetworkFunction, NetworkFunction_TO},
+    functions::{
+        FuncArg, FunctionCtx, FunctionRet, NadiFunctions, NetworkFunction, NetworkFunction_TO,
+    },
     network::Network,
     plugins::{NadiExternalPlugin, NadiExternalPlugin_Ref},
 };
@@ -59,8 +61,8 @@ impl NetworkFunction for FancyPrint {
         .into()
     }
 
-    fn signature(&self) -> RString {
-        "()".into()
+    fn args(&self) -> RVec<FuncArg> {
+        vec![].into()
     }
 
     fn code(&self) -> RString where {
