@@ -15,7 +15,7 @@ mod graphics {
     use nadi_core::nadi_plugin::{network_func, node_func};
     use nadi_core::prelude::*;
     use nadi_core::string_template::Template;
-    use nadi_core::timeseries::TimeSeriesValues;
+    use nadi_core::timeseries::Series;
     use polars::prelude::*;
     use std::path::PathBuf;
     use std::str::FromStr;
@@ -47,7 +47,7 @@ mod graphics {
             .select([col(&date_col), cols(&columns)])
             .collect()?;
 
-        let values: Vec<TimeSeriesValues> = match data_type.as_str() {
+        let values: Vec<Series> = match data_type.as_str() {
             "Floats" => {
                 let df2 = df
                     .clone()
@@ -58,7 +58,7 @@ mod graphics {
                 for col in &columns {
                     let s = df2.column(col)?;
                     let v: Vec<f64> = s.f64()?.into_no_null_iter().collect();
-                    vals.push(TimeSeriesValues::floats(v));
+                    vals.push(Series::floats(v));
                 }
                 vals
             }
@@ -72,7 +72,7 @@ mod graphics {
                 for col in &columns {
                     let s = df2.column(col)?;
                     let v: Vec<i64> = s.i64()?.into_no_null_iter().collect();
-                    vals.push(TimeSeriesValues::integers(v));
+                    vals.push(Series::integers(v));
                 }
                 vals
             }
@@ -88,9 +88,7 @@ mod graphics {
                 for col in &columns {
                     let s = df2.column(col)?;
                     let v: Vec<&str> = s.str()?.into_no_null_iter().collect();
-                    vals.push(TimeSeriesValues::strings(
-                        v.into_iter().map(RString::from).collect(),
-                    ));
+                    vals.push(Series::strings(v.into_iter().map(RString::from).collect()));
                 }
                 vals
             }
@@ -104,7 +102,7 @@ mod graphics {
                 for col in &columns {
                     let s = df2.column(col)?;
                     let v: Vec<bool> = s.bool()?.into_no_null_iter().collect();
-                    vals.push(TimeSeriesValues::booleans(v));
+                    vals.push(Series::booleans(v));
                 }
                 vals
             }
