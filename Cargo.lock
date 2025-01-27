@@ -539,6 +539,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "data-filling"
+version = "0.1.0"
+dependencies = [
+ "abi_stable",
+ "nadi_core",
+ "polars",
+]
+
+[[package]]
 name = "dyn-clone"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
