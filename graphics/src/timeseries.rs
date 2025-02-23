@@ -1,5 +1,6 @@
 use crate::plots::*;
 use abi_stable::std_types::RSome;
+use nadi_core::graphics::color::{AttrColor, Color};
 use nadi_core::prelude::*;
 use nadi_core::string_template::Template;
 use polars::prelude::*;
@@ -128,6 +129,8 @@ pub fn csv_data_blocks_svg(
                 let (ux, uy) = (dx / l, dy / l);
                 let (sx, sy) = (x + ux * config.radius * 1.4, y + uy * config.radius * 1.4);
                 let (ex, ey) = (xo - ux * config.radius * 1.4, yo - uy * config.radius * 1.4);
+
+                set_node_color(&n, &ctx, nadi_core::graphics::node::LINE_COLOR.0);
                 ctx.move_to(sx, sy);
                 ctx.line_to(ex, ey);
                 ctx.stroke()?;
@@ -146,20 +149,29 @@ pub fn csv_data_blocks_svg(
                 ctx.fill()?;
                 ctx.stroke()?;
             }
-            ctx.move_to(x + config.radius, y);
-            ctx.arc(x, y, config.radius, 0.0, 2.0 * 3.1416);
-            ctx.fill()?;
-            ctx.stroke()?;
+            ctx.move_to(x, y);
+            n.draw_color(&ctx)?;
+            set_node_color(&n, &ctx, nadi_core::graphics::node::TEXT_COLOR.0);
             ctx.move_to(label_start, y);
             ctx.show_text(&l)?;
-            ctx.set_source_rgb(0.35, 0.65, 0.3);
             draw_blocks(&ctx, block_start, y, dely / 3.0, &blks)?;
-            ctx.set_source_rgb(0.35, 0.35, 0.6);
             Ok(())
         },
     )?;
 
     Ok(())
+}
+
+fn set_node_color(node: &NodeInner, ctx: &cairo::Context, attr: &str) {
+    let c = node.try_attr::<AttrColor>(attr).unwrap_or_default();
+    match c.color() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("{e}");
+            Color::default()
+        }
+    }
+    .set(ctx);
 }
 
 pub fn csv_data_blocks(net: &Network, file: PathBuf, date_col: String) -> anyhow::Result<Blocks> {

@@ -6,13 +6,17 @@ mod datafill {
     use nadi_core::abi_stable::external_types::RMutex;
     use nadi_core::abi_stable::std_types::RArc;
     use nadi_core::anyhow::{self, bail, Context};
-    use nadi_core::nadi_plugin::node_func;
+    use nadi_core::nadi_plugin::{network_func, node_func};
     use nadi_core::prelude::*;
     use nadi_core::string_template::Template;
     use nadi_core::timeseries;
     use polars::prelude::*;
     use rand::{rngs::StdRng, SeedableRng};
     use std::collections::HashMap;
+    use std::fs::File;
+    use std::io::{BufWriter, Write};
+    use std::ops::Mul;
+    use std::path::PathBuf;
 
     #[node_func(method = DataFillMethod::Linear, dtype = "Floats")]
     fn load_csv_fill(
@@ -87,6 +91,79 @@ mod datafill {
         Ok(())
     }
 
+    /// Write the given nodes to csv with given attributes and experiment results
+    #[network_func]
+    fn save_experiments_csv(
+        net: &mut Network,
+        #[prop] prop: &Propagation,
+        /// Path to the output csv
+        outfile: PathBuf,
+        /// list of attributes to write
+        attrs: Vec<String>,
+        /// Prefix
+        prefix: String,
+        /// list of errors to write
+        errors: Vec<String>,
+    ) -> anyhow::Result<()> {
+        let f = File::create(&outfile)?;
+        let mut w = BufWriter::new(f);
+        let middle = !attrs.is_empty() && !errors.is_empty();
+        // headers for the csv
+        writeln!(
+            w,
+            "{}{}experiment,method,{}",
+            attrs.join(","),
+            if middle { "," } else { "" },
+            errors.join(",")
+        )?;
+        let methods = ["forward", "backward", "linear", "iratio", "oratio"];
+        for node in net.nodes_propagation(prop).map_err(anyhow::Error::msg)? {
+            let node = node.lock();
+            let attrs: Vec<String> = attrs
+                .iter()
+                .map(|a| node.attr(a).map(|a| a.to_string()).unwrap_or_default())
+                .collect();
+
+            for m in methods {
+                let series: Vec<Vec<String>> = errors
+                    .iter()
+                    .map(|e| {
+                        node.series(&format!("{prefix}_{m}_{e}"))
+                            .map(|s| {
+                                s.clone()
+                                    .to_attributes()
+                                    .into_iter()
+                                    .map(|a| a.to_string())
+                                    .collect()
+                            })
+                            .unwrap_or_default()
+                    })
+                    .collect();
+                let lengths: Vec<usize> = series.iter().map(|s| s.len()).collect();
+                if errors.is_empty() {
+                    writeln!(w, "{}", attrs.join(","))?;
+                    continue;
+                } else if lengths.iter().any(|l| *l != lengths[0]) {
+                    return Err(anyhow::Error::msg(format!(
+                        "Node {}: Series lengths don't match: {lengths:?}",
+                        node.name()
+                    )));
+                }
+                for i in 0..lengths[0] {
+                    let values: Vec<&str> = series.iter().map(|s| s[i].as_str()).collect();
+                    writeln!(
+                        w,
+                        "{}{}{i},{m},{}",
+                        attrs.join(","),
+                        if middle { "," } else { "" },
+                        values.join(",")
+                    )?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     #[node_func(experiments = 10usize, samples = 100usize)]
     fn datafill_experiment(
         node: &mut NodeInner,
@@ -94,6 +171,8 @@ mod datafill {
         name: String,
         /// Template of the CSV file for the nodes
         file: Template,
+        /// Variable to use for inputratio/outputratio methods
+        ratio_var: String,
         // todo: make a String or Int datatype and impl FromAttribute
         /// Names of date column and value column
         columns: Option<(String, String)>,
@@ -123,10 +202,10 @@ mod datafill {
                 dtcol.clone().alias(dtname),
                 valcol.clone().alias(node.name()),
             ])
-            .select([col(dtname), col(node.name())])
-            .drop_nulls(None);
+            .select([col(dtname), col(node.name())]);
         node.inputs()
             .iter()
+            .chain(node.output().into_option())
             .try_for_each(|n| -> anyhow::Result<()> {
                 let n = n.lock();
                 let csv = n.render(&file)?;
@@ -151,26 +230,33 @@ mod datafill {
                 );
                 Ok(())
             })?;
-        let df2 = df.collect()?;
+        let df2 = df.drop_nulls(None).collect()?;
         let ht = df2.height();
-        let errors: HashMap<&'static str, Vec<f64>> = ["rmse", "nrmse", "abserr", "nse"]
-            .into_iter()
-            .map(|k| (k, Vec::with_capacity(experiments)))
-            .collect();
-        let mut fill_methods = [
+        if ht < (samples / 10) {
+            println!(
+                "Warn: Node {} doesn't have enough values ({ht}) to experiment, skipping",
+                node.name()
+            );
+            return Ok(());
+        }
+        let err_metrics = ["rmse", "nrmse", "abserr", "nse"];
+        let mut errors: HashMap<(&'static str, &'static str), Vec<f64>> = HashMap::new();
+        // ["rmse", "nrmse", "abserr", "nse"]
+        //     .into_iter()
+        //     .map(|k| (k, Vec::with_capacity(experiments)))
+        //     .collect();
+        let fill_methods = [
             (
                 "forward",
                 DataFillMethod::Strategy(FillNullStrategy::Forward(None)),
-                errors.clone(),
             ),
             (
                 "backward",
                 DataFillMethod::Strategy(FillNullStrategy::Backward(None)),
-                errors.clone(),
             ),
-            ("linear", DataFillMethod::Linear, errors),
+            ("linear", DataFillMethod::Linear),
         ];
-        for _ in 0..experiments {
+        for i in 0..experiments {
             let mut rng = StdRng::from_rng(&mut rand::rng());
             let indices: Vec<i64> = rand::seq::index::sample(&mut rng, ht, samples)
                 .iter()
@@ -194,26 +280,97 @@ mod datafill {
                         .alias("new_vals"),
                 )
                 .collect()?;
-
-            for (_, method, errors) in &mut fill_methods {
+            for (mname, method) in &fill_methods {
                 let fill: ExprFunc = method.polars_fn()?;
-                let df = df
+                let mut df = df
                     .clone()
                     .lazy()
                     .with_column(fill(col("new_vals")))
                     .filter(col("sample"))
                     .collect()?;
+                let mut file =
+                    std::fs::File::create(format!("/tmp/experiments/{i}-{mname}.csv")).unwrap();
+                CsvWriter::new(&mut file).finish(&mut df).unwrap();
                 let obs: Vec<f64> = df.column(node.name())?.f64()?.into_no_null_iter().collect();
                 let sim: Vec<f64> = df.column("new_vals")?.f64()?.into_no_null_iter().collect();
-                for (e, errs) in errors {
+                for e in &err_metrics {
+                    let errs = errors
+                        .entry((mname, e))
+                        .or_insert_with(|| Vec::with_capacity(experiments));
                     errs.push(calc_error(&obs, &sim, e).expect("should be a known error"));
                 }
             }
-        }
-        for (mname, _, errors) in fill_methods {
-            for (e, errs) in errors {
-                node.set_series(&format!("{name}_{mname}_{e}"), errs.into());
+            // input ratio
+            let var = &ratio_var;
+            let val: f64 = node.try_attr(var).unwrap_or(0.0);
+            let oval: f64 = node
+                .output()
+                .map(|o| o.lock().try_attr(var).unwrap_or(0.0))
+                .unwrap_or(0.0);
+            let ival: f64 = node
+                .inputs()
+                .iter()
+                .map(|n| n.lock().try_attr::<f64>(var).unwrap_or(0.0))
+                .sum();
+            let iratio = val / ival;
+            let oratio = val / oval;
+            let isum: Vec<Expr> = node.inputs().iter().map(|n| col(n.lock().name())).collect();
+            let ifill = |mut e: Expr| -> Expr {
+                for i in isum {
+                    e = e + i;
+                }
+                e.mul(lit(iratio))
+            };
+            let oname = node
+                .output()
+                .map(|o| o.lock().name().to_string())
+                .unwrap_or_default();
+            let mut df = df
+                .clone()
+                .lazy()
+                .with_column(ifill(lit(0)).alias("iratio_vals"))
+                .with_column(col(&oname).mul(lit(oratio)).alias("oratio_vals"))
+                .with_column(
+                    when(col("new_vals").is_null())
+                        .then(col("iratio_vals"))
+                        .otherwise(col("new_vals"))
+                        .alias("iratio_fills"),
+                )
+                .with_column(
+                    when(col("new_vals").is_null())
+                        .then(col("oratio_vals"))
+                        .otherwise(col("new_vals"))
+                        .alias("oratio_fills"),
+                )
+                .filter(col("sample"))
+                .collect()?;
+            let mut file =
+                std::fs::File::create(format!("/tmp/experiments/{i}-ratio.csv")).unwrap();
+            CsvWriter::new(&mut file).finish(&mut df).unwrap();
+            let obs: Vec<f64> = df.column(node.name())?.f64()?.into_no_null_iter().collect();
+            let sim1: Vec<f64> = df
+                .column("iratio_fills")?
+                .f64()?
+                .into_no_null_iter()
+                .collect();
+            let sim2: Vec<f64> = df
+                .column("oratio_fills")?
+                .f64()?
+                .into_no_null_iter()
+                .collect();
+            for e in err_metrics {
+                let errs = errors
+                    .entry(("iratio", e))
+                    .or_insert_with(|| Vec::with_capacity(experiments));
+                errs.push(calc_error(&obs, &sim1, e).expect("should be a known error"));
+                let errs = errors
+                    .entry(("oratio", e))
+                    .or_insert_with(|| Vec::with_capacity(experiments));
+                errs.push(calc_error(&obs, &sim2, e).expect("should be a known error"));
             }
+        }
+        for ((mname, e), errs) in errors {
+            node.set_series(&format!("{name}_{mname}_{e}"), errs.into());
         }
         Ok(())
     }
@@ -366,7 +523,7 @@ mod utils {
                 "minbound" => no_data(Self::Strategy(FillNullStrategy::MinBound)),
                 "linear" => no_data(Self::Linear),
                 "nearest" => no_data(Self::Nearest),
-                "input_ratio" | "ratio" => {
+                "input_ratio" | "iratio" => {
                     if data.is_empty() {
                         Err(format!("Data fill method {:?} requires variables", data))
                     } else {
