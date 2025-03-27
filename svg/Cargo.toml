@@ -1,0 +1,14 @@
+[package]
+name = "nadi_svg"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+nadi_core = {version = "0.6.0", path = "../../nadi_core"}
+abi_stable = "0.11.3"
+anyhow = "1.0.93"
+svg = "0.18.0"
+
