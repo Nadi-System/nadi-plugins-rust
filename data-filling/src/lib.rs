@@ -95,7 +95,6 @@ mod datafill {
     #[network_func]
     fn save_experiments_csv(
         net: &mut Network,
-        #[prop] prop: &Propagation,
         /// Path to the output csv
         outfile: PathBuf,
         /// list of attributes to write
@@ -104,6 +103,7 @@ mod datafill {
         prefix: String,
         /// list of errors to write
         errors: Vec<String>,
+        filter: Option<Vec<bool>>,
     ) -> anyhow::Result<()> {
         let f = File::create(&outfile)?;
         let mut w = BufWriter::new(f);
@@ -117,7 +117,16 @@ mod datafill {
             errors.join(",")
         )?;
         let methods = ["forward", "backward", "linear", "iratio", "oratio"];
-        for node in net.nodes_propagation(prop).map_err(anyhow::Error::msg)? {
+        let nodes: Vec<&Node> = if let Some(filt) = filter {
+            net.nodes()
+                .zip(filt)
+                .filter(|(_, f)| *f)
+                .map(|n| n.0)
+                .collect()
+        } else {
+            net.nodes().collect()
+        };
+        for node in nodes {
             let node = node.lock();
             let attrs: Vec<String> = attrs
                 .iter()

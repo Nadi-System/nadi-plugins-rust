@@ -11,7 +11,7 @@ mod errors {
     */
     #[node_func(error = "rmse")]
     fn calc_ts_error(
-        node: &mut NodeInner,
+        node: &NodeInner,
         /// Timeseries value to use as actual value
         ts1: &str,
         /// Timeseries value to be used to calculate the error

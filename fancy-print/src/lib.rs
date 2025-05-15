@@ -81,7 +81,7 @@ impl NetworkFunction for FancyPrint {
         .into()
     }
 
-    fn call(&self, network: &mut Network, _ctx: &FunctionCtx) -> FunctionRet {
+    fn call(&self, network: &Network, _ctx: &FunctionCtx) -> FunctionRet {
         for node in network.nodes() {
             let n = node.lock();
             print!("[{}] {}", n.index(), n.name().blue());
